@@ -1,0 +1,8 @@
+show dbs
+show dbs.
+mongo db
+mongo
+show
+show databases
+cls
+mongosh "mongodb+srv://mycluster.abcd1.mongodb.net/myFirstDatabase" --apiVersion 1 --username admin

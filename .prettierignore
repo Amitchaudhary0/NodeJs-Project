@@ -1,0 +1,31 @@
+# Ignore build output
+dist/
+build/
+
+# Ignore node_modules
+node_modules/
+
+# Ignore lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Ignore coverage reports
+coverage/
+
+# Ignore configuration and environment files
+*.log
+.env
+.env.*
+
+# Ignore specific directories
+public/
+generated/
+
+# Ignore minified or compiled files
+*.min.js
+*.min.css
+*.bundle.js
+
+# Ignore specific files
+src/vendor-lib.js
