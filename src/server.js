@@ -1,9 +1,8 @@
-import express from "express";
 import "dotenv/config";
 import { connectDB } from "./db/index.js";
-import mongoose from "mongoose";
+import { app } from "./app.js";
 
-const app = express();
+
 
 connectDB();
 
@@ -24,10 +23,7 @@ connectDB();
 //   }
 // })();
 
-app
-  .listen(process.env.PORT || 8000, () => {
-    console.log("production grade code is running in port:", process.env.PORT);
-  })
-  .on(error => {
-    console.log("Error in Node App", error);
-  });
+app.listen(process.env.PORT || 8000, () => {
+  console.log(`Server is listning in: http://localhost:${process.env.PORT}/`);
+}).on("error", error => console.log("Error in the Express app", error));
+

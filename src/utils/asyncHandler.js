@@ -2,15 +2,13 @@
 //                          Using Promise async handler
 // =========================================================================================
 
-const asyncHandler=(handlerFuntion)=>{
-    (req, res, next)=>{
-        Promise.resolve(handlerFuntion(req, res, next)).catch((err)=>{
-            next(err);
-        })
-    }
-}
-
-
+export const asyncHandler = handlerFunction => {
+  return (req, res, next) => {
+    Promise.resolve(handlerFunction(req, res, next)).catch(err => {
+      next(err);
+    });
+  };
+};
 
 // =========================================================================================
 //                          Using Try Catch async handler
@@ -26,4 +24,3 @@ const asyncHandler=(handlerFuntion)=>{
 //         });
 //     }
 // }
-

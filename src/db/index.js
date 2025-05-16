@@ -3,7 +3,12 @@ import { DATABASE_NAME } from "../constants.js";
 
 export async function connectDB() {
   try {
-    const connectionInstance = await connect(`${process.env.MONGODB_URI}/${DATABASE_NAME}`);
+    const connectionInstance = await connect(
+      `${process.env.MONGODB_URI}/${DATABASE_NAME}`,
+      {
+        authSource: "admin",
+      }
+    );
     console.log(
       "Database connected successfully!!",
       connectionInstance.connection.host
