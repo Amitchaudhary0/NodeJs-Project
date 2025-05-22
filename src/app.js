@@ -14,8 +14,10 @@ app.use(cookieParser());
 //                            ----⏬ Router Imports ⏬----
 // ================================================================================
 import userRouter from "./routes/user.route.js";
+import { healthCheck } from "./controllers/healthCheck.controller.js";
 
 // ================================================================================
 //                            ----⏬ Define Routes ⏬----
 // ================================================================================
 app.use("/api/v1/users", userRouter);
+app.get("/api/v1/healthCheck", healthCheck);
