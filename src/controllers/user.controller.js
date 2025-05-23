@@ -8,8 +8,8 @@ const generateAccessAndRefreshTokens = async user => {
   // for now i have used user but we have to send the userId
   try {
     // const user = await User.findById(userId);
-    const accessToken = user.generateAccessToken();
-    const refreshToken = user.generateRefreshToken();
+    const accessToken = await user.generateAccessToken();
+    const refreshToken = await user.generateRefreshToken();
 
     user.refreshToken = refreshToken;
     await user.save({ validBeforeSave: false }); // we have to make sure we are not valiating user because we just want to save the refresh token
@@ -20,7 +20,7 @@ const generateAccessAndRefreshTokens = async user => {
   }
 };
 
-export const registerUser = asyncHandler(async (req, res, next) => {
+export const registerUser = asyncHandler(async (req, res, _) => {
   // get data from frontend
   // once we get the data from frontend we have to check all the validation
   // check do user exists
@@ -75,6 +75,7 @@ export const registerUser = asyncHandler(async (req, res, next) => {
     password,
     avatar: avatar.url,
     coverImage: coverImage?.url || null,
+    refreshToken: null,
   });
 
   const createdUser = await User.findById(user._id).select("-password -refreshToken");
@@ -84,7 +85,7 @@ export const registerUser = asyncHandler(async (req, res, next) => {
   res.status(201).json(new ApiResponse(200, "User registered successfuly", createdUser));
 });
 
-export const loginUser = asyncHandler(async (req, res, next) => {
+export const loginUser = asyncHandler(async (req, res, _) => {
   // Take user data from req.body
   // check user data or not
   // check weather the user exist in db
@@ -94,7 +95,7 @@ export const loginUser = asyncHandler(async (req, res, next) => {
   // send the accessToken and refreshToken to user using cookiee parser or using simple api respnse
   // also remove the unwanted fields from the api response
 
-  const { username, email, password } = req.body;
+  const { username, email, password } = req.body || {};
   if (!username && !email) throw new ApiError(400, "Please enter username or email");
 
   const user = await User.findOne({ $or: [{ username }, { email }] });
@@ -112,9 +113,38 @@ export const loginUser = asyncHandler(async (req, res, next) => {
     secure: true,
   };
 
+  const responseData = {
+    username: user.username,
+    emai: user.email,
+    fullName: user.fullName,
+    avatar: user.avatar,
+    watchHistory: user.watchHistory,
+    refreshToken,
+    accessToken,
+  };
+
   res
     .status(200)
     .cookie("accessToken", accessToken, options)
     .cookie("refreshToken", refreshToken, options)
-    .json(new ApiResponse(200, { user: user, refreshToken, accessToken }, "User loggedin Successfully"));
+    .json(new ApiResponse(200, responseData, "User loggedin Successfully"));
+});
+
+export const logoutUser = asyncHandler(async (req, res, _) => {
+  // i will take the user id from the auth middleware
+  // find that user to run FindAndUpdate command
+  // now i will update the refresh token to undefined
+  // Also i have to check it should be updated ASAP
+  // Final step will be to clear the cookie from the browser
+
+  await User.findByIdAndUpdate(req.user?._id, { $set: { refreshToken: null } }, { new: true });
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+  res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(new ApiResponse(200, {}, "User logout successfuly"));
 });
