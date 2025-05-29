@@ -3,6 +3,12 @@ import { ApiError } from "../utils/apiErrorHandler.js";
 import { ApiResponse } from "../utils/apiResponse.js";
 import { User } from "../models/user.models.js";
 import { uploadOnCloudinary } from "../utils/cloudinaryUpload.js";
+import jwt from "jsonwebtoken";
+
+const options = {
+  httpOnly: true,
+  secure: true,
+};
 
 const generateAccessAndRefreshTokens = async user => {
   // for now i have used user but we have to send the userId
@@ -20,7 +26,7 @@ const generateAccessAndRefreshTokens = async user => {
   }
 };
 
-export const registerUser = asyncHandler(async (req, res, _) => {
+export const registerUser = asyncHandler(async (req, res) => {
   // get data from frontend
   // once we get the data from frontend we have to check all the validation
   // check do user exists
@@ -85,7 +91,7 @@ export const registerUser = asyncHandler(async (req, res, _) => {
   res.status(201).json(new ApiResponse(200, "User registered successfuly", createdUser));
 });
 
-export const loginUser = asyncHandler(async (req, res, _) => {
+export const loginUser = asyncHandler(async (req, res) => {
   // Take user data from req.body
   // check user data or not
   // check weather the user exist in db
@@ -108,11 +114,6 @@ export const loginUser = asyncHandler(async (req, res, _) => {
 
   // const loggedInUser = await User.findById(user._id).select("-refreshToken -password"); //we have done this to get the user details except refreshtoken and password also the refresh token would be empty in this case
 
-  const options = {
-    httpOnly: true,
-    secure: true,
-  };
-
   const responseData = {
     username: user.username,
     emai: user.email,
@@ -127,7 +128,7 @@ export const loginUser = asyncHandler(async (req, res, _) => {
     .status(200)
     .cookie("accessToken", accessToken, options)
     .cookie("refreshToken", refreshToken, options)
-    .json(new ApiResponse(200, responseData, "User loggedin Successfully"));
+    .json(new ApiResponse(200, "User loggedin Successfully", responseData));
 });
 
 export const logoutUser = asyncHandler(async (req, res, _) => {
@@ -138,13 +139,47 @@ export const logoutUser = asyncHandler(async (req, res, _) => {
   // Final step will be to clear the cookie from the browser
 
   await User.findByIdAndUpdate(req.user?._id, { $set: { refreshToken: null } }, { new: true });
-  const options = {
-    httpOnly: true,
-    secure: true,
-  };
   res
     .status(200)
     .clearCookie("accessToken", options)
     .clearCookie("refreshToken", options)
-    .json(new ApiResponse(200, {}, "User logout successfuly"));
+    .json(new ApiResponse(200, "User logout successfuly", {}));
+});
+
+export const refreshUserToken = asyncHandler(async (req, res) => {
+  // get refresh token
+  // Check for refresh token
+  // generate new access token
+  // send updated access token to user
+
+  const oldRefreshToken = req.body?.refreshToken || req.cookies?.refreshToken;
+
+  if (!oldRefreshToken) throw new ApiError(401, "Unauthorized request");
+  try {
+    const decodedToken = await jwt.verify(oldRefreshToken, process.env.REFRESH_TOKEN_SECRET);
+
+    const user = await User.findById(decodedToken?._id);
+    if (!user) throw new ApiError(401, "Invalid refresh token");
+
+    if (oldRefreshToken !== user?.refreshToken) throw new ApiError(400, "Refresh token is expired");
+
+    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(user);
+    const responseData = {
+      username: user.username,
+      emai: user.email,
+      fullName: user.fullName,
+      avatar: user.avatar,
+      watchHistory: user.watchHistory,
+      refreshToken,
+      accessToken,
+    };
+
+    return res
+      .status(200)
+      .cookie(refreshToken, options)
+      .cookie(accessToken, options)
+      .json(new ApiResponse(200, "Access and Refresh token generated succesfully", responseData));
+  } catch (error) {
+    throw new ApiError(401, error?.message || "Something went wrong while Refreshing User Token");
+  }
 });
