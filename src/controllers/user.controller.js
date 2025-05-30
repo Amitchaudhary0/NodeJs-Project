@@ -54,10 +54,10 @@ export const registerUser = asyncHandler(async (req, res) => {
     throw new ApiError(409, "User Already exists by entered User Name or Email");
   }
 
-  const avatarLocalPathName = req?.files?.avatar[0]?.path;
+  const avatarLocalPathName = req?.files?.avatar?.[0]?.path;
   let coverImageLocalPathName;
   if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0) {
-    coverImageLocalPathName = req.files.coverImage[0].path;
+    coverImageLocalPathName = req.files.coverImage?.[0].path;
   }
 
   if (!avatarLocalPathName) throw new ApiError(400, "Avatar image is required");
@@ -79,16 +79,25 @@ export const registerUser = asyncHandler(async (req, res) => {
     username: username.toLowerCase(),
     email,
     password,
-    avatar: avatar.url,
-    coverImage: coverImage?.url || null,
+    avatar: { url: avatar.url, id: avatar.public_id },
+    coverImage: { url: coverImage?.url, id: coverImage?.id } || {},
     refreshToken: null,
   });
 
-  const createdUser = await User.findById(user._id).select("-password -refreshToken");
+  const createdUser = await User.findById(user._id).select("-password -refreshToken -avatar.id -coverImage.id");
 
   if (!createdUser) throw new ApiError(500, "something went wrong while registering user");
 
-  res.status(201).json(new ApiResponse(200, "User registered successfuly", createdUser));
+  const responseData = {
+    username: createdUser.username,
+    email: createdUser.email,
+    fullName: createdUser.fullName,
+    avatar: createdUser.avatar?.url,
+    coverImage: createdUser.coverImage?.url,
+    watchHistory: createdUser.watchHistory,
+  };
+
+  res.status(201).json(new ApiResponse(200, "User registered successfuly", responseData));
 });
 
 export const loginUser = asyncHandler(async (req, res) => {
@@ -116,11 +125,11 @@ export const loginUser = asyncHandler(async (req, res) => {
 
   const responseData = {
     username: user.username,
-    emai: user.email,
+    email: user.email,
     fullName: user.fullName,
-    avatar: user.avatar,
+    avatar: user.avatar?.url,
     watchHistory: user.watchHistory,
-    refreshToken,
+    // refreshToken,
     accessToken,
   };
 
@@ -181,5 +190,113 @@ export const refreshUserToken = asyncHandler(async (req, res) => {
       .json(new ApiResponse(200, "Access and Refresh token generated succesfully", responseData));
   } catch (error) {
     throw new ApiError(401, error?.message || "Something went wrong while Refreshing User Token");
+  }
+});
+
+export const updateUserDetails = asyncHandler(async (req, res) => {
+  const { fullName, email, username } = req.body;
+
+  if (!(fullName || email || username)) throw new ApiError(400, "Please enter Full Name or Email or User Name");
+
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.user?._id,
+      {
+        $set: {
+          fullName,
+          username,
+          email,
+        },
+      },
+      { new: true }
+    ).select("-password -refreshToken -avatar.id -coverImage.id");
+
+    if (!user) throw new ApiError(400, "Unauthorized request");
+
+    const { avatar, coverImage, ...rest } = user?._doc;
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, "User Details Updated Sucessfully", { ...rest, avatar: avatar?.url, coverImage: coverImage?.url }));
+  } catch (error) {
+    throw new ApiError(400, error?.message || "Something went wrong while updating user details");
+  }
+});
+
+export const updateUserAvatar = asyncHandler(async (req, res) => {
+  const localPathName = req.file?.path;
+  if (!localPathName) throw new ApiError(400, "Avatar Image is required");
+  try {
+    const uploadedImage = await uploadOnCloudinary(localPathName, "IMAGE", req.user?.avatar?.id, true);
+
+    if (!uploadedImage) throw new ApiError(401, "Failed to upload image");
+
+    const user = await User.findByIdAndUpdate(
+      req.user?._id,
+      { $set: { avatar: { url: uploadedImage?.url, id: uploadedImage?.public_id } } },
+      { new: true }
+    ).select("-password -refreshToken -avatar.id");
+    if (!user) throw new ApiError(401, "Unauthorized request");
+
+    const { password, avatar, coverImage, refreshToken, ...rest } = user?._doc;
+
+    return res.status(200).json(new ApiResponse(200, "Avatar updated Sucessfully", { ...rest, avatar: avatar?.url, coverImage: coverImage?.url }));
+  } catch (error) {
+    throw new ApiError(401, error?.message || "Something went wrong while updating Avatar");
+  }
+});
+
+export const updateUserCoverImage = asyncHandler(async (req, res) => {
+  const localPathName = req.file?.path;
+  if (!localPathName) throw new ApiError(400, "Cover Image is required");
+  try {
+    const uploadedImage = await uploadOnCloudinary(localPathName, "IMAGE", req.user?.coverImage?.id, true);
+
+    if (!uploadedImage) throw new ApiError(401, "Failed to upload image");
+
+    const user = await User.findByIdAndUpdate(
+      req.user?._id,
+      { $set: { coverImage: { url: uploadedImage?.url, id: uploadedImage?.public_id } } },
+      { new: true }
+    ).select("-password -refreshToken -avatar.id");
+    if (!user) throw new ApiError(401, "Unauthorized request");
+
+    const { password, avatar, coverImage, refreshToken, ...rest } = user?._doc;
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, "coverImage updated Sucessfully", { ...rest, avatar: avatar?.url, coverImage: coverImage?.url }));
+  } catch (error) {
+    throw new ApiError(401, error?.message || "Something went wrong while updating Avatar");
+  }
+});
+
+export const updateUserPassword = asyncHandler(async (req, res) => {
+  // take user input
+  // varify user input
+  // varify oldPassword from the password saved in DB
+  // if password is correct change the current password
+
+  const { oldPassword, newPassword, confirmPassword } = req.body;
+  const missingFields = [];
+  if (!oldPassword) missingFields.push("Old password");
+  if (!newPassword) missingFields.push("New password");
+  if (!confirmPassword) missingFields.push("Confirm password");
+  if (missingFields.length > 0) {
+    throw new ApiError(400, `${missingFields.join(", ")} is required`);
+  } else if (!(newPassword === confirmPassword)) {
+    throw new ApiError(400, "New password and Confirm password doesn't match");
+  }
+  try {
+    const user = await User.findById(req.user?._id);
+    if (!user) throw new ApiError(400, "Unauthorized request");
+    const isOldPasswordCorrect = await user.isPasswordCorrect(oldPassword);
+    if (!isOldPasswordCorrect) throw new ApiError(401, "Please enter valid Password Old password doesn't match");
+    user.password = newPassword;
+    await user.save({ validBeforeSave: false });
+
+    return res.status(200).json(new ApiResponse(200, "Password updated sucessfully"));
+  } catch (error) {
+    throw new ApiError(500, error?.message ?? "Something went wrong while updating password");
   }
 });

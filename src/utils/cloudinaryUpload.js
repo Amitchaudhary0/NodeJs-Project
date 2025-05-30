@@ -14,16 +14,20 @@ const ResourceType = Object.freeze({
   AUTO: "auto",
 });
 
-export const uploadOnCloudinary = async (localFilePath, fileType) => {
+export const uploadOnCloudinary = async (localFilePath, fileType, public_id = null, overwrite = false) => {
   try {
     if (!localFilePath) return null;
 
-    const uploadResult = await cloudinary.uploader.upload(localFilePath, { resource_type: ResourceType[fileType] });
+    const uploadResult = await cloudinary.uploader.upload(localFilePath, {
+      resource_type: ResourceType[fileType],
+      public_id,
+      overwrite,
+    });
     console.log("File uploaded in Cloudinary Successfuly", uploadResult);
-    fs.unlinkSync(localFilePath);
+    if (fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
     return uploadResult;
   } catch (error) {
-    fs.unlinkSync(localFilePath);
+    if (fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
     console.log("Error while uploading file in Cloudinary", error);
     return null;
   }
