@@ -28,7 +28,7 @@ export const uploadOnCloudinary = async (localFilePath, fileType, public_id = nu
     return uploadResult;
   } catch (error) {
     if (fs.existsSync(localFilePath)) fs.unlinkSync(localFilePath);
-    console.log("Error while uploading file in Cloudinary", error);
+    console.log("Error while uploading file in Cloudinary", error?.message);
     return null;
   }
 };

@@ -1,5 +1,7 @@
 import { Router } from "express";
 import {
+  getSubscriberDetails,
+  getUser,
   loginUser,
   logoutUser,
   refreshUserToken,
@@ -28,5 +30,6 @@ router.route("/updateUserDetails").patch(authenticatUser, updateUserDetails);
 router.route("/updateUserPassword").patch(authenticatUser, updateUserPassword);
 router.route("/updateUserAvatar").patch(authenticatUser, upload.single("avatar"), updateUserAvatar);
 router.route("/updateUserCoverImage").patch(authenticatUser, upload.single("coverImage"), updateUserCoverImage);
-
+router.route("/getUser").get(authenticatUser, getUser);
+router.route("/getSubscriberDetails/:username").get(getSubscriberDetails);
 export default router;

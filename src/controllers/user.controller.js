@@ -300,3 +300,76 @@ export const updateUserPassword = asyncHandler(async (req, res) => {
     throw new ApiError(500, error?.message ?? "Something went wrong while updating password");
   }
 });
+
+export const getUser = asyncHandler(async (req, res) => {
+  const user = req.user;
+  if (!user) throw new ApiError(400, "Unauthorized request");
+  const { password, avatar, coverImage, refreshToken, ...rest } = user?._doc;
+  return res
+    .status(200)
+    .json(new ApiResponse(200, "User details fetched successfully", { ...rest, avatar: avatar?.url, coverImage: coverImage?.url }));
+});
+
+export const getSubscriberDetails = asyncHandler(async (req, res) => {
+  // get the username from the params
+  // once get check for the user if user is presnt then we have to do write the pipleine
+  // find the subscribers and channels
+  // count subscribers and channels
+  // also find he has subscribed or not
+
+  const { username } = req.params;
+  if (!username?.trim()) throw new ApiError(400, "Please Provide Username");
+
+  const channel = await User.aggregate([
+    {
+      $match: {
+        username: username?.trim()?.toLowerCase(),
+      },
+    },
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscribers",
+      },
+    },
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "subscriber",
+        as: "subscribedTo",
+      },
+    },
+    {
+      $addFields: {
+        subscribersCount: { $size: "$subscribers" },
+        subscribedToCount: { $size: "$subscribedTo" },
+        isSubscribed: {
+          $cond: {
+            if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+            then: true,
+            else: false,
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        username: 1,
+        fullName: 1,
+        email: 1,
+        avatar: 1,
+        coverImage: 1,
+        subscribedToCount: 1,
+        subscribersCount: 1,
+        isSubscribed: 1,
+      },
+    },
+  ]);
+
+  if(!channel.length) throw new ApiError(404,"Channel not found")
+    const {_id, avatar, coverImage, ...rest } = channel[0];
+  res.status(200).json(new ApiResponse(200, "channel details fetched successfuly", { ...rest, avatar: avatar?.url, coverImage: coverImage?.url }));
+});
